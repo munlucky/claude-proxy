@@ -1,0 +1,19 @@
+services:
+  claude-proxy:
+    build: .
+    container_name: claude-proxy
+    ports:
+      - "3000:3000"
+    environment:
+      # 외부 Anthropic API URL (필요시 변경)
+      - BASE_URL=https://api.z.ai/api/anthropic
+      # ntfy 알림 설정 (필요시 토픽 이름 설정)
+      # - NTFY_TOPIC=your-topic-name
+      # - NTFY_SERVER=https://ntfy.sh
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
