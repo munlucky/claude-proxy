@@ -79,6 +79,21 @@ def filter_headers(headers: Dict[str, str]) -> Dict[str, str]:
     return filtered
 
 
+def filter_response_headers(headers: Dict[str, str]) -> Dict[str, str]:
+    """응답 헤더에서 전달하면 안 되는 항목 제거"""
+    filtered = dict(headers)
+    for key in [
+        "content-length",
+        "Content-Length",
+        "content-encoding",
+        "Content-Encoding",
+        "transfer-encoding",
+        "Transfer-Encoding",
+    ]:
+        filtered.pop(key, None)
+    return filtered
+
+
 async def stream_upstream(
     method: str,
     url: str,
@@ -94,9 +109,7 @@ async def stream_upstream(
             content=body,
         ) as response:
             # 먼저 상태 코드와 헤더를 yield
-            response_headers = dict(response.headers)
-            response_headers.pop("content-length", None)
-            response_headers.pop("Content-Length", None)
+            response_headers = filter_response_headers(dict(response.headers))
 
             yield {"status_code": response.status_code, "headers": response_headers}
 
@@ -144,9 +157,7 @@ async def proxy_anthropic(request: Request, path: str) -> Response:
                     content=body,
                 )
 
-                response_headers = dict(response.headers)
-                response_headers.pop("content-length", None)
-                response_headers.pop("Content-Length", None)
+                response_headers = filter_response_headers(dict(response.headers))
 
                 return Response(
                     content=response.content,
