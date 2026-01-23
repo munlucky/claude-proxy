@@ -15,6 +15,9 @@ BASE_URL = os.getenv("BASE_URL", "https://api.z.ai/api/anthropic")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "")
 NTFY_SERVER = os.getenv("NTFY_SERVER", "https://ntfy.sh")
 
+# 타임아웃 설정 (스트리밍: 300초, 연결: 10초)
+STREAM_TIMEOUT = httpx.Timeout(300.0, connect=10.0)
+
 app = FastAPI(
     title="Claude Proxy Server",
     description="Anthropic API 로컬 프록시 서버",
@@ -101,7 +104,7 @@ async def stream_upstream(
     body: bytes,
 ):
     """업스트림 서버와 스트리밍 통신"""
-    async with httpx.AsyncClient(timeout=None) as client:
+    async with httpx.AsyncClient(timeout=STREAM_TIMEOUT) as client:
         async with client.stream(
             method=method,
             url=url,
@@ -138,8 +141,14 @@ async def proxy_anthropic(request: Request, path: str) -> Response:
             meta = await stream_gen.__anext__()
 
             async def generate():
-                async for chunk in stream_gen:
-                    yield chunk
+                try:
+                    async for chunk in stream_gen:
+                        yield chunk
+                except Exception as e:
+                    error_msg = f"Streaming interrupted: {str(e)}"
+                    print(f"Error during streaming: {e}")
+                    await send_ntfy_notification(f"Claude Proxy Stream Error: {error_msg}")
+                    raise e
 
             return StreamingResponse(
                 generate(),
